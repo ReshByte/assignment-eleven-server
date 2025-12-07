@@ -30,6 +30,7 @@ async function run() {
     const favoriteCollection = db.collection("favorites");
     const userCollection = db.collection("users");
     const orderCollection = db.collection("orders");
+    const roleRequestCollection = db.collection("roleRequests");
 
     console.log("Connected to MongoDB Successfully!");
 
@@ -74,6 +75,8 @@ async function run() {
         res.status(500).send({ error: "Failed to update admin role" });
       }
     });
+
+
 
     // ------------------------
     // MEALS ROUTES
@@ -124,7 +127,42 @@ async function run() {
     });
 
 
-    //order
+    // Create a role request
+app.post("/role-requests", async (req, res) => {
+  try {
+    const request = req.body;
+
+    // Check if request already exists and is pending
+    const exists = await roleRequestCollection.findOne({
+      userEmail: request.userEmail,
+      requestType: request.requestType,
+      requestStatus: "pending",
+    });
+    if (exists) return res.send({ success: false, message: "You already have a pending request." });
+
+    await roleRequestCollection.insertOne(request);
+    res.send({ success: true, message: "Request submitted successfully." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Failed to submit request." });
+  }
+});
+
+
+    //get order
+
+    // Get orders by user email
+app.get("/orders/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    const orders = await orderCollection.find({ userEmail: email }).sort({ orderTime: -1 }).toArray();
+    res.send({ success: true, orders });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Failed to fetch orders" });
+  }
+});
+
     
 // Create order
 app.post("/orders", async (req, res) => {
