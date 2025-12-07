@@ -29,6 +29,7 @@ async function run() {
     const reviewCollection = db.collection("reviews");
     const favoriteCollection = db.collection("favorites");
     const userCollection = db.collection("users");
+    const orderCollection = db.collection("orders");
 
     console.log("Connected to MongoDB Successfully!");
 
@@ -121,6 +122,21 @@ async function run() {
         res.status(500).send({ error: "Failed to fetch meal details" });
       }
     });
+
+
+    //order
+    
+// Create order
+app.post("/orders", async (req, res) => {
+  try {
+    const order = req.body;
+    const result = await orderCollection.insertOne(order);
+    res.send({ success: true, insertedId: result.insertedId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Failed to place order" });
+  }
+});
 
     // ------------------------
     // REVIEW ROUTES
