@@ -226,6 +226,9 @@ async function run() {
       });
     });
 
+    //stripe
+    
+
     app.post("/meals", async (req, res) => {
       const item = req.body;
       const result = await mealCollection.insertOne(item);
