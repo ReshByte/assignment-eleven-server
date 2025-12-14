@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
+
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -143,36 +145,94 @@ async function run() {
 
 //----------------------------------------------------------
 
-    app.post("/create-payment-intent", async (req, res) => {
-      const { price } = req.body;
-      const amount = parseInt(price * 100);
+    // app.post("/create-payment-intent", async (req, res) => {
+    //   const { price } = req.body;
+    //   const amount = parseInt(price * 100);
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
+    //   const paymentIntent = await stripe.paymentIntents.create({
+    //     amount: amount,
+    //     currency: "usd",
+    //     payment_method_types: ["card"],
+    //   });
 
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
-    });
+    //   res.send({
+    //     clientSecret: paymentIntent.client_secret,
+    //   });
+    // });
 
-    app.post("/payments", async (req, res) => {
-      const payment = req.body;
-      const paymentResult = await paymentCollection.insertOne(payment);
+    // app.post("/payments", async (req, res) => {
+    //   const payment = req.body;
+    //   const paymentResult = await paymentCollection.insertOne(payment);
 
-      const query = { _id: new ObjectId(payment.orderId) };
-      const updateDoc = {
-        $set: {
-          paymentStatus: "paid",
-          transactionId: payment.transactionId,
+    //   const query = { _id: new ObjectId(payment.orderId) };
+    //   const updateDoc = {
+    //     $set: {
+    //       paymentStatus: "paid",
+    //       transactionId: payment.transactionId,
+    //     },
+    //   };
+    //   const updateResult = await orderCollection.updateOne(query, updateDoc);
+
+    //   res.send({ paymentResult, updateResult });
+    // });
+
+    app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const { orderId, price, mealName, email } = req.body;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      customer_email: email,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: mealName,
+            },
+            unit_amount: Math.round(price * 100),
+          },
+          quantity: 1,
         },
-      };
-      const updateResult = await orderCollection.updateOne(query, updateDoc);
-
-      res.send({ paymentResult, updateResult });
+      ],
+      success_url: `http://localhost:5173/payment-success?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `http://localhost:5173/dashboard/my-orders`,
     });
+
+    res.send({ url: session.url });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Stripe session failed" });
+  }
+});
+
+
+   app.post("/payments", async (req, res) => {
+  const { orderId, transactionId } = req.body;
+
+  // Save payment history
+  await paymentCollection.insertOne({
+    orderId,
+    transactionId,
+    paidAt: new Date(),
+  });
+
+  // Update order
+  await orderCollection.updateOne(
+    { _id: new ObjectId(orderId) },
+    {
+      $set: {
+        paymentStatus: "paid",
+        transactionId,
+      },
+    }
+  );
+
+  res.send({ success: true });
+});
+
+
 
     app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
@@ -372,39 +432,45 @@ app.patch("/role-requests/:id", async (req, res) => {
           res.status(500).send({ message: "Internal Server Error" });
       }
     });
+
+    
     app.post("/orders", async (req, res) => {
-      const order = req.body;
-      const result = await orderCollection.insertOne(order);
-      res.send(result);
-    });
+  const order = req.body;
+  const result = await orderCollection.insertOne(order);
+  res.send(result);
+});
 
-    app.get("/orders/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { userEmail: email };
-      const result = await orderCollection
-        .find(query)
-        .sort({ orderTime: -1 })
-        .toArray();
-      res.send(result);
-    });
+// Get orders by user email
+app.get("/orders/:email", async (req, res) => {
+  const email = req.params.email;
+  const query = { userEmail: email };
+  const result = await orderCollection.find(query).sort({ orderTime: -1 }).toArray();
+  res.send(result);
+});
 
-    app.get("/orders/chef/:chefId", async (req, res) => {
-      const chefId = req.params.chefId;
-      const query = { chefId: chefId };
-      const result = await orderCollection.find(query).toArray();
-      res.send(result);
-    });
+// Get pending orders for chef
+app.get("/orders/chef/:chefId", async (req, res) => {
+  const chefId = Number(req.params.chefId); // Convert to number
+  const query = { chefId: chefId };
+  const result = await orderCollection.find(query).toArray();
+  res.send(result);
+});
 
-    app.patch("/orders/:id", async (req, res) => {
-      const id = req.params.id;
-      const { status } = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: { orderStatus: status },
-      };
-      const result = await orderCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+
+
+
+
+// Confirm order by chef
+app.patch("/orders/:id", async (req, res) => {
+  const id = req.params.id;
+  const { status } = req.body; // "accepted" or "rejected"
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = { $set: { orderStatus: status } };
+  const result = await orderCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
+
+
 
     app.get("/reviews", async (req, res) => {
       const result = await reviewCollection.find().sort({ date: -1 }).toArray();
@@ -467,11 +533,22 @@ app.patch("/role-requests/:id", async (req, res) => {
     });
 
     app.delete("/favorites/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await favoriteCollection.deleteOne(query);
-      res.send(result);
-    });
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await favoriteCollection.deleteOne(query);
+
+    if (result.deletedCount > 0) {
+      res.send({ success: true, message: "Favorite deleted successfully" });
+    } else {
+      res.send({ success: false, message: "Favorite not found" });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
   } catch (error) {
     console.error(error);
   }
