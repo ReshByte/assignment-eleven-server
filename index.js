@@ -384,23 +384,23 @@ app.patch("/role-requests/:id", async (req, res) => {
 
       console.log(`Processing Request ID: ${id}`);
 
-      // এখানে চেক করা হচ্ছে আইডিটি কি ObjectId ফরম্যাটের নাকি সাধারণ স্ট্রিং
+   
       let filter = {};
       if (ObjectId.isValid(id)) {
           filter = { _id: new ObjectId(id) };
       } else {
-          filter = { _id: id }; // যদি সাধারণ স্ট্রিং আইডি হয়
+          filter = { _id: id }; 
       }
       
       try {
-          // ১. রিকোয়েস্টটি খুঁজে বের করা
+         
           const requestDoc = await roleRequestCollection.findOne(filter);
           
           if (!requestDoc) {
             return res.status(404).send({ message: "Request not found in Database" });
           }
 
-          // ২. স্ট্যাটাস আপডেট করা
+        
           const updatedDoc = {
             $set: { requestStatus: status }
           };
@@ -414,9 +414,9 @@ app.patch("/role-requests/:id", async (req, res) => {
             let userUpdateDoc = {};
 
             if (type === 'chef') {
-              const chefId = "CHEF-" + Math.floor(100000 + Math.random() * 900000);
-              userUpdateDoc = { $set: { role: 'chef', chefId: chefId } };
-            } else if (type === 'admin') {
+         const chefId = requestDoc.chefId; // ডাটাবেসের numeric chefId ব্যবহার
+          userUpdateDoc = { $set: { role: 'chef', chefId: chefId } };
+          }else if (type === 'admin') {
               userUpdateDoc = { $set: { role: 'admin' } };
             }
 
@@ -440,23 +440,26 @@ app.patch("/role-requests/:id", async (req, res) => {
   res.send(result);
 });
 
-// Get orders by user email
-app.get("/orders/:email", async (req, res) => {
-  const email = req.params.email;
-  const query = { userEmail: email };
-  const result = await orderCollection.find(query).sort({ orderTime: -1 }).toArray();
-  res.send(result);
-});
-
 // Get pending orders for chef
 app.get("/orders/chef/:chefId", async (req, res) => {
+  console.log(req.params.chefId);
+  
   const chefId = Number(req.params.chefId); // Convert to number
+
   const query = { chefId: chefId };
   const result = await orderCollection.find(query).toArray();
   res.send(result);
 });
 
-
+// Get orders by user email
+app.get("/orders/:email", async (req, res) => {
+  const email = req.params.email;
+  
+  
+  const query = { userEmail: email };
+  const result = await orderCollection.find(query).sort({ orderTime: -1 }).toArray();
+  res.send(result);
+});
 
 
 
