@@ -24,7 +24,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db("chef_db");
 
     const mealCollection = db.collection("meals");
@@ -196,8 +196,8 @@ async function run() {
           quantity: 1,
         },
       ],
-      success_url: `http://localhost:5173/payment-success?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:5173/dashboard/my-orders`,
+      success_url: `https://assignment-11-679ac.web.app/payment-success?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `https://assignment-11-679ac.web.app/dashboard/my-orders`,
     });
 
     res.send({ url: session.url });
@@ -440,7 +440,7 @@ app.patch("/role-requests/:id", async (req, res) => {
   res.send(result);
 });
 
-// GET ALL ORDERS (সব অর্ডার দেখার জন্য)
+
     app.get("/orders", async (req, res) => {
       try {
         const result = await orderCollection.find().toArray();
@@ -603,4 +603,3 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-//
